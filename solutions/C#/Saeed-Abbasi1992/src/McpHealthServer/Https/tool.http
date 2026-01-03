@@ -1,0 +1,11 @@
+### Execute check_api_status tool
+POST http://localhost:5000/mcp/tool
+Content-Type: application/json
+
+{
+  "sessionId": "{{SESSION_ID}}",
+  "name": "check_api_status",
+  "input": {
+    "url": "https://example.com/health"
+  }
+}

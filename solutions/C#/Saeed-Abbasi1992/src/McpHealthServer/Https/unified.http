@@ -1,0 +1,36 @@
+### JSON-RPC Initialize via Unified Endpoint
+POST http://localhost:5000/mcp/unified
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "clientInfo": {
+      "name": "DotNetMCPClient",
+      "version": "1.0.0"
+    },
+    "capabilities": {
+      "roots": { "listChanged": true },
+      "sampling": {}
+    }
+  }
+}
+
+### JSON-RPC Tool Invocation via Unified Endpoint
+POST http://localhost:5000/mcp/unified
+Content-Type: application/json
+
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "check_api_status",
+  "params": {
+    "sessionId": "{{SESSION_ID}}",
+    "name": "check_api_status",
+    "input": {
+      "url": "https://example.com/health"
+    }
+  }
+}

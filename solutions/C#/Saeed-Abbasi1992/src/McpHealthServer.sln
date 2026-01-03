@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36414.22
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "McpHealthServer", "McpHealthServer\McpHealthServer.csproj", "{84F2802B-58FF-408F-B272-36DC4C34EF88}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "..\tests\Tests.csproj", "{AEC1003A-F6D2-C24B-8EFF-80A817BE465D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{84F2802B-58FF-408F-B272-36DC4C34EF88}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{84F2802B-58FF-408F-B272-36DC4C34EF88}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{84F2802B-58FF-408F-B272-36DC4C34EF88}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{84F2802B-58FF-408F-B272-36DC4C34EF88}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AEC1003A-F6D2-C24B-8EFF-80A817BE465D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AEC1003A-F6D2-C24B-8EFF-80A817BE465D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AEC1003A-F6D2-C24B-8EFF-80A817BE465D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AEC1003A-F6D2-C24B-8EFF-80A817BE465D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {763265BD-FC21-495F-8F10-1B472621DBA8}
+	EndGlobalSection
+EndGlobal

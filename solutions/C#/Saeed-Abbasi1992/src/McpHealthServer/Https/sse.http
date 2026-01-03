@@ -1,0 +1,3 @@
+### SSE Handshake
+GET http://localhost:5000/mcp/sse/{{SESSION_ID}}
+Accept: text/event-stream

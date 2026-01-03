@@ -1,0 +1,14 @@
+### Initialize MCP Session
+POST http://localhost:5000/mcp/initialize
+Content-Type: application/json
+
+{
+  "clientInfo": {
+    "name": "DotNetMCPClient",
+    "version": "1.0.0"
+  },
+  "capabilities": {
+    "roots": { "listChanged": true },
+    "sampling": {}
+  }
+}
