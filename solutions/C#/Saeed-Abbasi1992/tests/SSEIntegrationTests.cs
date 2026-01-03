@@ -40,14 +40,14 @@ namespace Tests
         {
             var client = _factory.CreateClient();
 
-            // 1️ Initialize session
+            //1.Initialize session
             var initResponse = await client.PostAsync("/mcp/initialize", null);
             var initJson = await initResponse.Content.ReadAsStringAsync();
             var initData = JsonSerializer.Deserialize<InitializeResponse>(initJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             Assert.IsNotNull(initData);
             var sessionId = initData.SessionId;
 
-            // 2️ Mock HttpClient for tool
+            //2.Mock HttpClient for tool
             var mockHandler = new Mock<HttpMessageHandler>();
             mockHandler.SetupRequest(HttpMethod.Get, "https://example.com/health")
                        .ReturnsResponse(HttpStatusCode.OK);
@@ -55,13 +55,13 @@ namespace Tests
             var logger = Mock.Of<ILogger<CheckApiStatusTool>>();
             var tool = new CheckApiStatusTool(mockedHttpClient, logger);
 
-            // 3️ Enqueue tool result in the real SessionService
+            //3.Enqueue tool result in the real SessionService
             var scope = _factory.Services.CreateScope();
             var sessionService = scope.ServiceProvider.GetRequiredService<SessionService>();
             var toolResult = await tool.ExecuteAsync("https://example.com/health");
             sessionService.EnqueueResponse(sessionId, toolResult);
 
-            // 4️ Start SSE stream
+            // 4.Start SSE stream
             var sseRequest = new HttpRequestMessage(HttpMethod.Get, $"/mcp/sse/{sessionId}");
             var sseResponse = await client.SendAsync(sseRequest, HttpCompletionOption.ResponseHeadersRead);
             sseResponse.EnsureSuccessStatusCode();
@@ -69,11 +69,11 @@ namespace Tests
             using var stream = await sseResponse.Content.ReadAsStreamAsync();
             using var reader = new System.IO.StreamReader(stream);
 
-            // 5️ Read handshake event
+            // 5.Read handshake event
             string firstLine = await reader.ReadLineAsync();
             Assert.IsTrue(firstLine.Contains("event: mcp.ready"));
 
-            // 6️ Read tool result event (with timeout)
+            // 6.Read tool result event (with timeout)
             bool toolResultReceived = false;
             var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(5));
 
