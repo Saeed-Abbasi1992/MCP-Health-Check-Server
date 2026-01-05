@@ -1,157 +1,249 @@
-# MCP Health Server
+# Standalone MCP Health Check Server (ASP.NET Core)
 
-This project implements a simplified MCP (Microservice Control Protocol) Health Server in .NET 8, providing endpoints to initialize sessions, stream tool results via SSE, and handle JSON-RPC requests. It includes session management, session cleanup, and logging.
+This project implements a **Standalone MCP (Model Context Protocol) Server** that allows AI models to query the health status of cloud services over the public internet in a **standard, testable way** using **HTTP + Server-Sent Events (SSE)**.
 
-## Table of Contents
+The implementation is designed specifically to satisfy the requirements of the MCP Health Check challenge and focuses on:
+- MCP lifecycle compliance (Initialize → Handshake → Tool Invocation)
+- Multi-client session management
+- Secure and reliable health probing (`check_api_status` tool)
+- SSRF protection via domain allowlisting
 
-- [Endpoints](#endpoints)
-- [Session Management](#session-management)
-- [Tools](#tools)
-- [SSE (Server-Sent Events)](#sse-server-sent-events)
-- [JSON-RPC Unified Endpoint](#json-rpc-unified-endpoint)
-- [Logging](#logging)
-- [Session Cleanup](#session-cleanup)
-- [Testing](#testing)
+---
 
-## Endpoints
+##  Features
 
-### Initialize
+- ✅ Full MCP lifecycle over HTTP + SSE
+- ✅ Multi-client concurrent sessions with isolation
+- ✅ `check_api_status` tool for HTTP health checks
+- ✅ Session-bound SSE streaming (no cross-talk)
+- ✅ Configurable request timeout
+- ✅ SSRF protection using domain allowlist
+- ✅ Automatic session expiration (TTL)
+- ✅ Clean, testable ASP.NET Core (.NET 8) architecture
 
-- **URL:** `/mcp/initialize`
-- **Method:** `POST`
-- **Description:** Creates a new session and returns capabilities.
-- **Response Example:**
+---
+
+##  MCP Lifecycle Overview
+
+1. **Initialize (HTTP)**
+   - Client starts a new MCP session
+   - Server returns `session_id`, capabilities, available tools, and SSE URL
+
+2. **Handshake (HTTP + SSE)**
+   - Client connects to the SSE stream using `session_id`
+   - Server emits handshake/ready events
+
+3. **Tool Invocation (HTTP)**
+   - Client invokes `check_api_status`
+   - Server executes the probe and streams results via SSE
+
+---
+
+##  API Endpoints
+
+### 1.Initialize Session
+
+**Endpoint**
+```
+POST /mcp/initialize
+```
+
+**Description**
+Creates a new MCP session and returns protocol metadata.
+
+**Response Example:**
 ```json
 {
   "protocol": "mcp",
   "protocolVersion": "2024-11-05",
-  "sessionId": "b3a6f1f2-3e7b-4b1d-8cfa-2f5d3c4a9e1f",
+  "sessionId": "ef5066fd-2b89-40f4-acd2-6078ea8b16ce",
   "capabilities": {
     "tools": [
-      { "name": "check_api_status", "inputSchema": { "url": "string" } }
+      {
+        "name": "check_api_status",
+        "inputSchema": {
+          "url": "string"
+        }
+      }
     ]
   },
-  "sseUrl": "/mcp/sse/b3a6f1f2-3e7b-4b1d-8cfa-2f5d3c4a9e1f"
+  "sseUrl": "/mcp/sse/ef5066fd-2b89-40f4-acd2-6078ea8b16ce"
 }
 ```
 
-### Tool Execution
+---
 
-- **URL:** `/mcp/tools/`
-- **Method:** `POST`
-- **Description:** Sends a tool request for a given session.
-- **Request Example:**
+### 2.SSE Handshake / Stream
+
+**Endpoint**
+```
+GET /mcp/sse?session_id={session_id}
+```
+
+**Description**
+Opens a Server-Sent Events connection bound to the given session.
+
+**Events Emitted**
+- `handshake`
+- `ready`
+- `tool_result`
+- `error`
+
+**Example SSE Event**
+```
+event: ready
+data: {"message":"Session is active"}
+```
+
+---
+
+### 3.Tool Invocation
+
+**Endpoint**
+```
+POST /mcp/tools
+```
+
+**Request Body**
 ```json
 {
-  "sessionId": "b3a6f1f2-3e7b-4b1d-8cfa-2f5d3c4a9e1f",
+  "session_id": "ef5066fd-2b89-40f4-acd2-6078ea8b16ce",
   "name": "check_api_status",
   "input": {
-    "url": "https://example.com/health"
+    "url": "api.mycompany.com/health"
   }
 }
 ```
-- **Response Example:**  
-  - HTTP 202 Accepted
+
+**Notes**
+- URL may be provided **without scheme**
+- `https://` is assumed by default
+- Domain must be allowlisted
+
+---
+
+##  Tool: `check_api_status`
+
+### Input
 ```json
 {
-  "accepted": true,
-  "sessionId": "b3a6f1f2-3e7b-4b1d-8cfa-2f5d3c4a9e1f"
+  "url": "api.mycompany.com/health"
 }
 ```
 
-### SSE (Server-Sent Events)
-
-- **URL:** `/mcp/sse/{sessionId}`
-- **Method:** `GET`
-- **Description:** Streams handshake and tool results for a session.
-- **Handshake Event:**
-```text
-event: mcp.ready
-data: {"sessionId":"b3a6f1f2-3e7b-4b1d-8cfa-2f5d3c4a9e1f","message":"Session active, send tool requests to /mcp/tool"}
-```
-- **Tool Result Event:**
+### Success Output
 ```json
 {
-  "url": "https://example.com/health",
+  "url": "https://api.mycompany.com/health",
   "status": "UP",
   "http_status": 200,
   "latency_ms": 87,
   "checked_at": "2025-12-30T12:00:00Z"
 }
 ```
-- **Failure Example:**
+
+### Failure Output
 ```json
 {
-  "url": "https://example.com/health",
+  "url": "https://api.mycompany.com/health",
   "status": "DOWN",
   "error": "Timeout after 3000ms",
   "checked_at": "2025-12-30T12:00:00Z"
 }
 ```
 
-### JSON-RPC Unified Endpoint
+### Behavior
+- Default timeout: **3000 ms** (configurable)
+- Handles:
+  - Timeouts
+  - DNS failures
+  - TLS errors
+  - Non-2xx HTTP responses
+- Never crashes the server
 
-- **URL:** `/mcp/unified`
-- **Method:** `POST`
-- **Description:** Handles JSON-RPC requests for any MCP operation.
-- **Request Example:**
+---
+
+##  Security & SSRF Protection
+
+To mitigate SSRF risks, the server enforces a **domain allowlist policy**:
+
+- Only domains defined in configuration are allowed
+- Subdomains are allowed (e.g. `sub.api.mycompany.com`)
+- Private, loopback, and local IP ranges are blocked
+- Only HTTP/HTTPS schemes are accepted
+
+### Example Configuration
+
 ```json
 {
-  "jsonrpc": "2.0",
-  "method": "check_api_status",
-  "params": {
-    "sessionId": "b3a6f1f2-3e7b-4b1d-8cfa-2f5d3c4a9e1f",
-    "name": "check_api_status",
-    "input": { "url": "https://example.com/health" }
-  },
-  "id": 1
+  "UrlPolicy": {
+    "AllowedDomains": [
+      "api.mycompany.com"
+    ]
+  }
 }
 ```
 
-- **Error Codes:**
-  - `-32700`: Parse Error
-  - `-32600`: Invalid Request
-  - `-32601`: Method Not Found
-  - `-32602`: Params Invalid
-  - `-32603`: Internal Error
-  - `-32800`: Request Cancelled
-  - `-32801`: Content Too Large
+**Allowed**
+- `api.mycompany.com/health`
+- `https://api.mycompany.com/health`
 
-## Session Management
+**Blocked**
+- `localhost/health`
+- `127.0.0.1/health`
+- `evil.com/api.mycompany.com`
 
-- Sessions are stored in memory using `SessionService`.
-- Each session has:
-  - `SessionId`
-  - Queue of tool results (`ConcurrentQueue<CheckHealthResponseBase>`)
-  - `LastActive` timestamp
-- Sessions support enqueue/dequeue of tool results for SSE streaming.
+---
 
-## Tools
+##  How to Run
 
-- Currently implemented: `CheckApiStatusTool`
-- Checks HTTP/HTTPS endpoint availability.
-- Returns `UpStatusResponse` or `DownStatusResponse`.
+### Prerequisites
+- .NET SDK 8.0+
 
-## Logging
+### Build & Run
 
-- All endpoints log requests, warnings, errors, and tool execution.
-- SSE handshake and tool results are logged.
+```bash
+dotnet restore
+dotnet build
+dotnet run --project src/McpHealthServer
+```
 
-## Session Cleanup
+Server starts on:
+```
+http://localhost:5058
+https://localhost:7184
+```
 
-- Implemented as a background `IHostedService` (`SessionCleanupService`).
-- Periodically removes sessions inactive beyond a TTL (default 30 minutes).
-- Logs cleanup operations.
+---
 
 ## Testing
 
-- Unit tests: NUnit
-- Integration tests: SSE handshake, tool execution, JSON-RPC
-- Use `Moq` for HTTP client mocking.
+```bash
+dotnet test
+```
 
-## Notes
+### Covered Scenarios
+- Initialize returns `session_id` and tools
+- SSE stream binds correctly to session
+- `check_api_status` reports UP/DOWN
+- Parallel sessions do not mix events
 
-- Ensure URLs follow the policy: no private IPs or loopback addresses.
-- SSE events are session-bound; each session has its own queue.
-- JSON serialization uses camelCase for consistency.
+---
+
+##  Design Notes
+
+- Session storage is thread-safe
+- SSE events are strictly session-scoped
+- Input normalization (URL scheme) is applied before execution
+- HttpClient is reused and timeout-controlled
+
+---
+
+##  Conclusion
+
+This server provides a clean, secure, and MCP-compliant way for AI models to query service health over the internet. It is production-minded while remaining simple and testable, making it suitable both for the challenge and real-world extensions.
+
+---
+
+**Author:** Saeed Abbasi
 

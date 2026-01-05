@@ -1,26 +1,59 @@
-﻿using System.Net;
-
-namespace McpHealthServer.Services;
+﻿using McpHealthServer.Options;
+using Microsoft.Extensions.Options;
+using System.Net;
 
 public class UrlPolicyService
 {
-    public bool IsAllowed(string url, out string reason)
+    private readonly HashSet<string> _allowedDomains;
+
+    public UrlPolicyService(IOptions<UrlPolicyOptions> options)
+    {
+        _allowedDomains = options.Value.AllowedDomains
+            .Select(NormalizeHost)
+            .ToHashSet();
+    }
+
+    public bool IsAllowed(string rawUrl, out string reason)
     {
         reason = null;
 
-        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+        if (string.IsNullOrWhiteSpace(rawUrl))
         {
-            reason = "Invalid URL";
+            reason = "URL is empty";
             return false;
         }
 
-        if (uri.Scheme != "http" && uri.Scheme != "https")
+        //Add default scheme if missing
+        if (!rawUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !rawUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            rawUrl = "https://" + rawUrl;
+        }
+
+        if (!Uri.TryCreate(rawUrl, UriKind.Absolute, out var uri))
+        {
+            reason = "Invalid URL format";
+            return false;
+        }
+
+        if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
         {
             reason = "Only HTTP/HTTPS allowed";
             return false;
         }
 
-        if (IsPrivateHost(uri.Host))
+        var host = NormalizeHost(uri.Host);
+
+        //Allowlist domain check
+        if (!_allowedDomains.Any(d =>
+            host == d || host.EndsWith("." + d)))
+        {
+            reason = "Domain not in allowlist";
+            return false;
+        }
+
+        //Block private / loopback IPs
+        if (IsPrivateOrLoopback(uri.Host))
         {
             reason = "Private or loopback address blocked";
             return false;
@@ -29,24 +62,29 @@ public class UrlPolicyService
         return true;
     }
 
-    private bool IsPrivateHost(string host)
+    private static string NormalizeHost(string host)
+    {
+        host = host.ToLowerInvariant();
+        return host.StartsWith("www.") ? host.Substring(4) : host;
+    }
+
+    private static bool IsPrivateOrLoopback(string host)
     {
         if (host.Equals("localhost", StringComparison.OrdinalIgnoreCase))
             return true;
 
         if (!IPAddress.TryParse(host, out var ip))
-            return false; // DNS name – allow (optional: resolve & check)
+            return false; // DNS name allowed
 
-        if (IPAddress.IsLoopback(ip)) //(127.0.0.1 OR ::1)
+        if (IPAddress.IsLoopback(ip))
             return true;
 
         var bytes = ip.GetAddressBytes();
-
         return bytes[0] switch
         {
-            10 => true,//10.x.x.x Private network class A
-            172 when bytes[1] >= 16 && bytes[1] <= 31 => true,//172.16.x.x – 172.31.x.x Private network class B
-            192 when bytes[1] == 168 => true,//x.x.192.168 Private network class C
+            10 => true,
+            172 when bytes[1] >= 16 && bytes[1] <= 31 => true,
+            192 when bytes[1] == 168 => true,
             _ => false
         };
     }

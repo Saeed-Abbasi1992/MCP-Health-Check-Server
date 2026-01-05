@@ -1,6 +1,7 @@
-﻿using System.Diagnostics;
-using McpHealthServer.Models;
+﻿using McpHealthServer.Models;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
+using System.Security.AccessControl;
 
 namespace McpHealthServer.Tools;
 
@@ -24,6 +25,8 @@ public class CheckApiStatusTool
 
         try
         {
+            url = NormalizeUrl(url);
+
             var response = await _httpClient.GetAsync(url);
             sw.Stop();
 
@@ -79,6 +82,17 @@ public class CheckApiStatusTool
                 Error = "Unexpected error"
             };
         }
+    }
+    
+    private static string NormalizeUrl(string url)
+    {
+        if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return url;
+        }
+
+        return "https://" + url;
     }
 }
 

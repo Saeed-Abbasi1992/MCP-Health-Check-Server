@@ -1,11 +1,13 @@
 using McpHealthServer;
 using McpHealthServer.Endpoints;
-using McpHealthServer.Services;
+using McpHealthServer.Options;
 using McpHealthServer.Tools;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddSingleton<SessionService>();
+
+builder.Services.Configure<UrlPolicyOptions>(builder.Configuration.GetSection("UrlPolicy"));
 
 builder.Services.Configure<SessionCleanupOptions>(builder.Configuration.GetSection(Constants.Config_SessionCleanUp_Key));
 
@@ -34,7 +36,6 @@ toolEndpoint.MapEndpoint(app);
 
 var jsonRpcEndpoint = app.Services.GetRequiredService<JSONRPCUnifiedEndPoint>();
 jsonRpcEndpoint.MapEndpoint(app);
-
 
 app.Run();
 

@@ -1,5 +1,4 @@
 ﻿using McpHealthServer.Models;
-using McpHealthServer.Services;
 using McpHealthServer.Tools;
 
 namespace McpHealthServer.Endpoints;
